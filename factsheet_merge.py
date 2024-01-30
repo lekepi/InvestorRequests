@@ -28,7 +28,7 @@ if __name__ == '__main__':
         month_num = datetime.strptime(month_str, "%B").month
         first_day_of_month = datetime(int(year_str), month_num, 1)
         df.loc[index, 'date'] = first_day_of_month
-    df = df.sort_values(by=['date'])
+    df = df.sort_values(by=['date'], ascending=False)
     pdf_merger = PdfWriter()
     for index, row in df.iterrows():
         pdf_path = Path(row['file_path'])
