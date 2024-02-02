@@ -1,6 +1,10 @@
 import pandas as pd
 from models import engine
 
+"""
+Get the exposure and PNL per month for Long/Short and total:
+by region, market_cap and sector
+"""
 
 def get_exposure_attribution():
 

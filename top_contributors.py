@@ -1,6 +1,11 @@
 import pandas as pd
 from models import engine, config_class
 
+"""
+Get the top 5 contributors/detractors in cash equity in absolute pnl (% of AUM) per month and per year
+"""
+
+
 def get_top_contributors():
     my_sql = """SELECT T2.ticker,T1.entry_date,T1.pnl_usd FROM position T1
 JOIN Product T2 ON T1.product_id = T2.id WHERE prod_type = 'Cash' AND entry_date>='2019-04-01'

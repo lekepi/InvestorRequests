@@ -4,6 +4,10 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
+"""
+function to merge all the pdf factsheets together
+"""
+
 
 def get_all_pdfs(folder_path):
     pdf_files = []

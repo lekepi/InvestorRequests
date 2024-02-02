@@ -4,6 +4,12 @@ from datetime import date, timedelta
 from utils import simple_email
 
 
+"""
+Get the turnover per year: for trade, we take all the net daily trade for all asset classes
+and divide it by the gross exposure (sum of all the absolute value Long+Short of the market value of the positions)
+"""
+
+
 def last_weekday_of_year(year):
     last_day = date(year, 12, 31)  # Set initial date to the last day of the given year
     while last_day.weekday() >= 5:  # 5 and 6 represent Saturday and Sunday

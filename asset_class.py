@@ -1,6 +1,13 @@
 import pandas as pd
 from models import engine, config_class
 
+
+"""
+Asset_class: Get the % of asset class traded per year. 
+We take the netvolume traded by day by product (long+short in absolute value). 
+We divide it by Cash Equity, CFD, Equity index and the rest
+"""
+
 def get_asset_class():
     my_sql = """SELECT min(T1.trade_date) as trade_date,T2.ticker,T2.prod_type,T4.name as country,T4.continent,
     T5.name as sector,T6.generic_future as security,abs(sum(T1.notional_usd)) as notional_usd 
