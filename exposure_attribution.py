@@ -6,7 +6,7 @@ Get the exposure and PNL per month for Long/Short and total:
 by region, market_cap and sector
 """
 
-def get_exposure_attribution():
+def get_exposure_attribution(is_close_pnl=True):
 
     # get list of start date of the month
     my_sql = """SELECT MIN(entry_date) AS first_date FROM position WHERE entry_date>='2019-04-01' 
@@ -22,12 +22,32 @@ LEFT JOIN exchange T3 on T2.exchange_id=T3.id LEFT JOIN country T4 on T3.country
 LEFT JOIN industry_sector T5 on T2.industry_sector_id=T5.id WHERE parent_fund_id=1 and entry_date in ({first_date_str}) and (T2.prod_type='Cash' or T2.ticker in ('ES1 CME', 'SXO1 EUX'))
 GROUP BY entry_date,T2.ticker,T2.prod_type,country,continent,sector order by T2.ticker,entry_date;"""
     df_exposure = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
+    df_exposure['month_year'] = df_exposure['entry_date'].dt.strftime('%Y-%m')
+    # remove entry_date
+    df_exposure = df_exposure.drop(columns=['entry_date'])
 
     my_sql = """SELECT min(T1.entry_date) as entry_date,T2.ticker,T2.prod_type,T4.name as country,T4.continent,T5.name as sector,sum(T1.pnl_usd) as pnl_usd FROM position T1 JOIN product T2 on T1.product_id=T2.id
 LEFT JOIN exchange T3 on T2.exchange_id=T3.id LEFT JOIN country T4 on T3.country_id=T4.id
 LEFT JOIN industry_sector T5 on T2.industry_sector_id=T5.id WHERE parent_fund_id=1 and entry_date>='2019-04-01' and (T2.prod_type='Cash' or T2.ticker in ('ES1 CME', 'SXO1 EUX'))
 GROUP BY YEAR(entry_date),MONTH(entry_date),T2.ticker,T2.prod_type,country,continent,sector order by T2.ticker,entry_date;"""
     df_pnl = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
+    df_pnl['month_year'] = df_pnl['entry_date'].dt.strftime('%Y-%m')
+    # remove entry_date
+    df_pnl = df_pnl.drop(columns=['entry_date'])
+
+    if is_close_pnl:
+        my_sql = f"""SELECT min(T1.trade_date) as entry_date,
+        CASE WHEN T3.generic_future IS NOT NULL THEN T3.generic_future ELSE T2.ticker END as ticker,sum(T1.pnl_close) as pnl_close FROM trade T1 
+        JOIN product T2 on T1.product_id=T2.id LEFT JOIN security T3 on T2.security_id=T3.id WHERE T1.parent_fund_id=1 and trade_date>='2019-04-01'
+        and (T2.prod_type in ('Cash', 'Future') or T3.generic_future in ('ES1 CME', 'SXO1 EUX')) GROUP BY YEAR(trade_date),MONTH(trade_date),ticker
+        order by ticker,T1.trade_date;"""
+        df_pnl_close = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
+        df_pnl_close['month_year'] = df_pnl_close['entry_date'].dt.strftime('%Y-%m')
+        # remove entry_date
+        df_pnl_close = df_pnl_close.drop(columns=['entry_date'])
+        df_pnl = df_pnl.merge(df_pnl_close, on=['month_year', 'ticker'], how='left')
+        df_pnl['pnl_close'] = df_pnl['pnl_close'].fillna(0)
+        df_pnl['pnl_usd'] = df_pnl['pnl_usd'] + df_pnl['pnl_close']
 
     # market cap
     my_sql = f"""SELECT T1.entry_date,T2.ticker,CASE WHEN T3.market_cap<3000 then '0-3Bn' WHEN T3.market_cap<10000 THEN '3-10Bn' else '>10Bn' END as market_cap
@@ -35,19 +55,21 @@ FROM position T1 JOIN product T2 on T1.product_id=T2.id JOIN product_market_cap 
 WHERE T1.entry_date in ({first_date_str})  and T2.prod_type='Cash' and T1.parent_fund_id=1
 GROUP by T1.entry_date,T2.ticker;"""
     df_market_cap = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
+    df_market_cap['month_year'] = df_market_cap['entry_date'].dt.strftime('%Y-%m')
+    # remove entry_date
+    df_market_cap = df_market_cap.drop(columns=['entry_date'])
 
-    df_exposure = df_exposure.merge(df_market_cap, on=['entry_date', 'ticker'], how='left')
+    df_exposure = df_exposure.merge(df_market_cap, on=['month_year', 'ticker'], how='left')
     df_exposure['market_cap'] = df_exposure.groupby('ticker')['market_cap'].fillna(method='ffill')
-    df_exposure.sort_values(by='entry_date', ascending=False, inplace=True)
+    df_exposure.sort_values(by='month_year', ascending=False, inplace=True)
 
-    df_pnl = df_pnl.merge(df_market_cap, on=['entry_date', 'ticker'], how='left')
+    df_pnl = df_pnl.merge(df_market_cap, on=['month_year', 'ticker'], how='left')
     df_pnl['market_cap'] = df_pnl.groupby('ticker')['market_cap'].fillna(method='ffill')
-    df_pnl.sort_values(by='entry_date', ascending=False, inplace=True)
+    df_pnl.sort_values(by='month_year', ascending=False, inplace=True)
 
-    df = df_exposure.merge(df_pnl, on=['entry_date', 'ticker', 'prod_type', 'country', 'continent', 'sector', 'market_cap'], how='left')
+    df = df_exposure.merge(df_pnl, on=['month_year', 'ticker', 'prod_type', 'country', 'continent', 'sector', 'market_cap'], how='left')
     df['notional_usd'] = df['notional_usd'].fillna(0)
     df['pnl_usd'] = df['pnl_usd'].fillna(0)
-    df['month_year'] = df['entry_date'].dt.strftime('%Y-%m')
 
     # df['sector'] = ' Index' when df['ticker'] in ('ES1 CME', 'SXO1 EUX') else df['sector']
     df['sector'] = df.apply(lambda x: 'Index' if x['ticker'] in ('ES1 CME', 'SXO1 EUX') else x['sector'], axis=1)
@@ -329,4 +351,4 @@ GROUP by T1.entry_date,T2.ticker;"""
 
 
 if __name__ == '__main__':
-    get_exposure_attribution()
+    get_exposure_attribution(is_close_pnl=True)
