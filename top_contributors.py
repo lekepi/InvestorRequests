@@ -63,16 +63,6 @@ order by entry_date"""
     df_bottom_year.to_excel('Excel/Top 5 detractors by year.xlsx', index=False)
 
 
-
-
-
-
-
-
-
-    pass
-
-
 if __name__ == '__main__':
     get_top_contributors()
     pass

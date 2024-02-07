@@ -166,6 +166,12 @@ class IndustryGroup(Base):
     name = Column(String(45))
 
 
+class IndustryGroupGics(Base):
+    __tablename__ = 'industry_group_gics'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(45))
+
+
 class Account(Base):
     __tablename__ = 'account'
     id = Column(Integer, primary_key=True)
@@ -259,6 +265,8 @@ class Product(Base):
     industry_sector = relationship("IndustrySector")
     industry_group_id = Column(ForeignKey("industry_group.id"))
     industry_group = relationship("IndustryGroup")
+    industry_group_gics_id = Column(ForeignKey("industry_group_gics.id"))
+    industry_group_gics = relationship("IndustryGroupGics")
     currency2_id = Column(ForeignKey("currency.id"))
     currency2 = relationship("Currency", foreign_keys=[currency2_id])
     is_cent = Column(Boolean)
