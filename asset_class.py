@@ -4,12 +4,12 @@ from models import engine, config_class
 
 """
 Asset_class: Get the % of asset class traded per year. 
-We take the netvolume traded by day by product (long+short in absolute value). 
+We take the net volume traded by day by product (long+short in absolute value). 
 We divide it by Cash Equity, CFD, Equity index and the rest
 """
 
 def get_asset_class():
-    my_sql = """SELECT min(T1.trade_date) as trade_date,T2.ticker,T2.prod_type,T4.name as country,T4.continent,
+    my_sql = """SELECT T1.trade_date,T2.ticker,T2.prod_type,T4.name as country,T4.continent,
     T5.name as sector,T6.generic_future as security,abs(sum(T1.notional_usd)) as notional_usd 
     FROM trade T1 JOIN product T2 on T1.product_id=T2.id
     LEFT JOIN exchange T3 on T2.exchange_id=T3.id JOIN country T4 on T3.country_id=T4.id
@@ -37,9 +37,7 @@ def get_asset_class():
 
     df_asset_class = df_asset_class.div(df_asset_class.sum(axis=1), axis=0).round(4) * 100
     # into excel
-    df_asset_class.to_excel('Asset Class per year.xlsx', index=True)
-
-
+    df_asset_class.to_excel('Excel\Asset Class per year.xlsx', index=True)
 
 
 if __name__ == '__main__':
