@@ -110,7 +110,6 @@ def get_position_size():
     sheet_list = workbook.sheetnames
     for sheet_name in sheet_list:
         sheet = workbook[sheet_name]
-        # column autofit
         for col in sheet.columns:
             max_length = 0
             column = col[0].column

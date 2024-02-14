@@ -2,7 +2,7 @@ import pandas as pd
 from models import engine
 
 """
-get the minimum market cap own by regoin EMEA, AMER
+get the minimum market cap own by region EMEA, AMER
 """
 
 def fill_market_cap(df):

@@ -97,6 +97,8 @@ def get_monthly_data(calcul_type, classification_list, numerator_list,
 
     df['notional_usd'] = df['notional_usd'].fillna(0)
     df['Sector'] = df.apply(lambda x: 'Index' if x['ticker'] in ('ES1 CME', 'SXO1 EUX') else x['Sector'], axis=1)
+    df['Country'] = df.apply(lambda x: 'S&P500' if x['ticker'] in ('ES1 CME') else x['Country'], axis=1)
+    df['Country'] = df.apply(lambda x: 'Stoxx 600' if x['ticker'] in ('SXO1 EUX') else x['Country'], axis=1)
 
     df.sort_values(by='month_year', ascending=False, inplace=True)
 
@@ -110,6 +112,7 @@ def get_monthly_data(calcul_type, classification_list, numerator_list,
     result_list = []
     for classification in classification_list:
         df_result = pd.DataFrame()
+        numerator_len_list = []
         for numerator in numerator_list:
             df_temp = df.copy()
             if numerator == 'Long':
@@ -120,17 +123,21 @@ def get_monthly_data(calcul_type, classification_list, numerator_list,
             df_temp = df_temp.groupby(['month_year', classification]).agg({f'{calcul_type}': 'sum'}).reset_index()
             df_pivot = df_temp.pivot(index='month_year', columns=classification, values=calcul_type).fillna(0)
             if 'Index' in df_pivot.columns:
-                # put at the end
                 df_pivot = df_pivot[[col for col in df_pivot.columns if col != 'Index'] + ['Index']]
+            if 'S&P500' in df_pivot.columns:
+                df_pivot = df_pivot[[col for col in df_pivot.columns if col != 'S&P500'] + ['S&P500']]
+            if 'Stoxx 600' in df_pivot.columns:
+                df_pivot = df_pivot[[col for col in df_pivot.columns if col != 'Stoxx 600'] + ['Stoxx 600']]
             if len(numerator_list) > 1:
                 # add numerator to the column name
                 df_pivot.columns = [f'{col} {numerator}' for col in df_pivot.columns]
+            numerator_len_list.append(len(df_pivot.columns))
             if df_result.empty:
                 df_result = df_pivot
             else:
                 df_result = df_result.merge(df_pivot, on='month_year', how='outer')
         df_result = df_result.sort_values(by='month_year', ascending=False)
-        result_list.append([classification, df_result])
+        result_list.append([classification, df_result, numerator_len_list])
 
     # create the excel file
     file_name = f'Excel/Monthly {calcul_type} Over {denominator}.xlsx'
@@ -140,16 +147,29 @@ def get_monthly_data(calcul_type, classification_list, numerator_list,
 
     # complete formatting
 
-    fill = PatternFill(start_color='66b8cc', end_color='66b8cc', fill_type='solid')
+    fill1 = PatternFill(start_color='66b8cc', end_color='66b8cc', fill_type='solid')
+    fill2 = PatternFill(start_color='f08c30', end_color='f08c30', fill_type='solid')
+
     workbook = load_workbook(file_name)
     for result in result_list:
         worksheet = workbook[result[0]]
+        numerator_len_list = result[2]
 
         df_temp = result[1]  # get the df
         num_cols = len(df_temp.columns)
         # header color
-        for col_num in range(1, num_cols + 2):
-            worksheet.cell(row=1, column=col_num).fill = fill
+
+        # for col_num in range(1, num_cols + 2):
+        #    worksheet.cell(row=1, column=col_num).fill = fill1
+        current_fill = fill1
+        col_index = 1
+        for num_cols_same_color in numerator_len_list:
+            for _ in range(num_cols_same_color):
+                worksheet.cell(row=1, column=col_index+1).fill = current_fill
+                col_index += 1
+            # Switch fill
+            current_fill = fill2 if current_fill == fill1 else fill1
+
             # Format columns 2 to the last as percentages
         # % format
         for col_num in range(2, num_cols + 2):
@@ -186,14 +206,14 @@ if __name__ == '__main__':
     end_date = date(2023, 12, 31)
 
     # exposure vs Nav - Leveraged
-    get_monthly_data(calcul_type='Exposure',
+    """get_monthly_data(calcul_type='Exposure',
                      classification_list=['Continent', 'Sector', 'MarketCap'],
                      numerator_list=['Net', 'Long', 'Short'],
                      denominator='Nav',
                      start_date=start_date,
                      end_date=end_date,
                      is_leveraged=True,
-                     is_close_pnl=True)
+                     is_close_pnl=True)"""
 
     # exposure vs Long only
     get_monthly_data(calcul_type='Exposure',
