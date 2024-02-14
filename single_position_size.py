@@ -75,13 +75,14 @@ def get_position_size():
     df_position_long['entry_date'] = df_position_long['entry_date'].dt.date
     df_position_short['entry_date'] = df_position_short['entry_date'].dt.date
 
-    excel_writer = pd.ExcelWriter('Excel/Single Position Size.xlsx', engine='openpyxl')
+    filename = 'Excel/Single Position Size.xlsx'
+    excel_writer = pd.ExcelWriter(filename, engine='openpyxl')
     df_position_long.to_excel(excel_writer, sheet_name='Position Long - All', startrow=0, index=False, header=True)
     df_position_short.to_excel(excel_writer, sheet_name='Position Short - All', startrow=0, index=False, header=True)
     df_avg_size.to_excel(excel_writer, sheet_name='Avg Position Size', startrow=0, index=False, header=True)
     excel_writer._save()
 
-    workbook = load_workbook('Excel/Single Position Size.xlsx')
+    workbook = load_workbook(filename)
     sheet_all_names = ['Position Long - All', 'Position Short - All']
 
     for sheet in sheet_all_names:
@@ -123,7 +124,7 @@ def get_position_size():
             sheet.column_dimensions[get_column_letter(column)].width = adjusted_width
     workbook.move_sheet('Avg Position Size', offset=-2)
 
-    workbook.save('Excel/Single Position Size.xlsx')
+    workbook.save(filename)
 
 
 if __name__ == '__main__':

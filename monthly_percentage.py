@@ -140,7 +140,13 @@ def get_monthly_data(calcul_type, classification_list, numerator_list,
         result_list.append([classification, df_result, numerator_len_list])
 
     # create the excel file
-    file_name = f'Excel/Monthly {calcul_type} Over {denominator}.xlsx'
+
+    if calcul_type == 'PnL':
+        calcul_type_string = 'Attribution'
+    else:
+        calcul_type_string = calcul_type
+
+    file_name = f'Excel/Monthly {calcul_type_string} Over {denominator}.xlsx'
     with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
         for result in result_list:
             result[1].to_excel(writer, sheet_name=result[0], header=True, index=True)

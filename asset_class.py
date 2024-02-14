@@ -33,7 +33,7 @@ def get_asset_class():
     df_trade['notional_usd'] = df_trade['notional_usd'].fillna(0)
     # pivot table with asset_class as columns, year as index, and sum of notional_usd as values
     df_asset_class = pd.pivot_table(df_trade, values='notional_usd', index=df_trade['trade_date'].dt.year,
-                              columns='asset_class', aggfunc='sum', fill_value=0)
+                                    columns='asset_class', aggfunc='sum', fill_value=0)
 
     df_asset_class = df_asset_class.div(df_asset_class.sum(axis=1), axis=0).round(4) * 100
     # into excel
