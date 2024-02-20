@@ -5,6 +5,10 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill
 
+'''
+Calculate the monthly AUM in an excel file, from the fund money or the leveraged AUM
+'''
+
 def get_monthly_aum(start_date, end_date, is_leveraged):
     if is_leveraged:
         my_type = 'leveraged'

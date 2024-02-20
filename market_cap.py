@@ -5,6 +5,7 @@ from models import engine
 get the minimum market cap own by region EMEA, AMER
 """
 
+
 def fill_market_cap(df):
     for i in range(1, len(df)):
         if pd.isnull(df.loc[i, 'market_cap']) and df.loc[i, 'ticker'] == df.loc[i-1, 'ticker']:

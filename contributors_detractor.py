@@ -6,11 +6,11 @@ from openpyxl.utils import get_column_letter
 from datetime import date
 
 """
-Get the top 5 contributors/detractors in cash equity in absolute pnl (% of AUM) per month and per year
+Get the top 5 contributors/detractors in cash equity in absolute pnl (% of AUM) or by Alpha per month and per year
 """
 
-def get_top_contributors(start_date, end_date):
-    my_sql = f"""SELECT T2.ticker,T1.entry_date,T1.pnl_usd FROM position T1
+def get_top_contributors(start_date, end_date, my_type):
+    my_sql = f"""SELECT T2.ticker,T1.entry_date,T1.{my_type} FROM position T1
 JOIN Product T2 ON T1.product_id = T2.id WHERE prod_type = 'Cash' AND entry_date>='{start_date}'
  AND entry_date<'{end_date}' AND parent_fund_id=1
 order by entry_date"""
@@ -24,7 +24,7 @@ order by entry_date"""
     df_temp = pd.merge(df_position, df_aum, on='entry_date', how='left')
     # fill with previous value
     df_temp['amount'] = df_temp['amount'].fillna(method='ffill')
-    df_temp['perf'] = df_temp['pnl_usd'] / df_temp['amount']
+    df_temp['perf'] = df_temp[my_type] / df_temp['amount']
 
     df_temp['month_year'] = df_temp['entry_date'].dt.strftime('%Y-%m')
     df = df_temp.groupby(['month_year', 'ticker'])['perf'].sum().reset_index()
@@ -63,8 +63,10 @@ order by entry_date"""
         df_bottom_5 = df_bottom_5.sort_values(by='perf', ascending=True)
         df_bottom_year[my_year] = df_bottom_5['ticker'].values
 
-    file_name = 'Excel/Return Based Contributors-Detractors.xlsx'
-
+    if my_type == 'pnl_usd':
+        file_name = 'Excel/Return Based Contributors-Detractors.xlsx'
+    else:
+        file_name = 'Excel/Alpha Based Contributors-Detractors.xlsx'
     # add incremental index starting at 1
     df_top_month.index = df_top_month.index + 1
     df_bottom_month.index = df_bottom_month.index + 1
@@ -117,5 +119,6 @@ if __name__ == '__main__':
 
     start_date = date(2019, 4, 1)
     end_date = date(2023, 12, 31)
-    get_top_contributors(start_date, end_date)
 
+    get_top_contributors(start_date, end_date, 'alpha_usd')
+    get_top_contributors(start_date, end_date, 'pnl_usd')

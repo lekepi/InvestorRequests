@@ -2,29 +2,21 @@ import pandas as pd
 from models import engine
 from datetime import date
 from openpyxl import load_workbook
-from openpyxl.styles import Font, PatternFill, numbers
+from openpyxl.styles import PatternFill, numbers
+
+'''
+Calculate in excel the exposure or attribution.
+You can decide the list of classification (Sector, Country, Continent, Market cap...) that will be one tab in the excel file.
+You can decide the list of numerator (Long, Short, Net) that will be extra columns in the excel file.
+You can the base / denominator (NAV, long, Short, gross, net).
+You can decide the start and end date.
+You can decide if the exposure is leveraged or not.
+You can decide if the pnl intraday from trade is included or not.
+'''
 
 
 def get_monthly_data(calcul_type, classification_list, numerator_list,
                      denominator, start_date, end_date, is_leveraged, is_close_pnl):
-
-    # get the denominator: long, short, net, gross, nav
-    if denominator == 'Long':
-        my_sql = """SELECT min(entry_date) as entry_date,long_usd as denominator FROM alpha_summary WHERE parent_fund_id=1
-                    GROUP BY YEAR(entry_date),MONTH(entry_date) order by entry_date;"""
-    elif denominator == 'Nav':
-        my_sql = f"""Select entry_date,amount*1000000 as denominator from aum where entry_date>='2019-04-01' 
-            and entry_date>='{start_date}' and entry_date<='{end_date}' and type='leveraged' order by entry_date"""
-    elif denominator == 'Gross':
-        my_sql = """SELECT min(entry_date) as entry_date,long_usd-short_usd as denominator FROM alpha_summary WHERE parent_fund_id=1 
-        GROUP BY YEAR(entry_date),MONTH(entry_date) order by entry_date;"""
-    elif denominator == 'Net':
-        my_sql = """SELECT min(entry_date)  as entry_date,long_usd+short_usd as denominator FROM alpha_summary WHERE parent_fund_id=1 
-        GROUP BY YEAR(entry_date),MONTH(entry_date) order by entry_date;"""
-
-    df_denominator = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
-    df_denominator['month_year'] = df_denominator['entry_date'].dt.strftime('%Y-%m')
-    df_denominator.drop(columns=['entry_date'], inplace=True)
 
     # get list of start date of the month
     my_sql = f"""SELECT MIN(entry_date) AS first_date FROM position WHERE entry_date>='{start_date}' 
@@ -42,6 +34,31 @@ def get_monthly_data(calcul_type, classification_list, numerator_list,
     df_exposure = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
     df_exposure['month_year'] = df_exposure['entry_date'].dt.strftime('%Y-%m')
     df_exposure = df_exposure.drop(columns=['entry_date'])
+
+    # get the denominator: long, short, net, gross, nav
+    if denominator == 'Long':
+        df_denominator = df_exposure[df_exposure['notional_usd'] >= 0]
+        df_denominator = df_denominator.groupby('month_year').agg({'notional_usd': 'sum'}).reset_index()
+        df_denominator.rename(columns={'notional_usd': 'denominator'}, inplace=True)
+    elif denominator == 'Short':
+        df_denominator = df_exposure[df_exposure['notional_usd'] < 0]
+        df_denominator = df_denominator.groupby('month_year').agg({'notional_usd': 'sum'}).reset_index()
+        df_denominator.rename(columns={'notional_usd': 'denominator'}, inplace=True)
+    elif denominator == 'Gross':
+        # absolute value of notional_usd
+        df_denominator = df_exposure.copy()
+        df_denominator['notional_usd'] = df_denominator['notional_usd'].abs()
+        df_denominator = df_denominator.groupby('month_year').agg({'notional_usd': 'sum'}).reset_index()
+        df_denominator.rename(columns={'notional_usd': 'denominator'}, inplace=True)
+    elif denominator == 'Net':
+        df_denominator = df_exposure.groupby('month_year').agg({'notional_usd': 'sum'}).reset_index()
+        df_denominator.rename(columns={'notional_usd': 'denominator'}, inplace=True)
+    elif denominator == 'Nav':
+        my_sql = f"""Select entry_date,amount*1000000 as denominator from aum where entry_date>='2019-04-01' 
+                and entry_date>='{start_date}' and entry_date<='{end_date}' and type='leveraged' order by entry_date"""
+        df_denominator = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
+        df_denominator['month_year'] = df_denominator['entry_date'].dt.strftime('%Y-%m')
+        df_denominator.drop(columns=['entry_date'], inplace=True)
 
     df_exposure.sort_values(by='month_year', ascending=False, inplace=True)
     df_exposure['notional_usd'] = df_exposure['notional_usd'].fillna(0)
@@ -120,6 +137,9 @@ def get_monthly_data(calcul_type, classification_list, numerator_list,
             elif numerator == 'Short':
                 df_temp = df_temp[df_temp['notional_usd'] < 0]
 
+            if (numerator == 'Long' and denominator == 'Short') or (numerator == 'Short' and denominator == 'Long'):
+                df_temp['Exposure'] = df_temp['Exposure'] * -1
+
             df_temp = df_temp.groupby(['month_year', classification]).agg({f'{calcul_type}': 'sum'}).reset_index()
             df_pivot = df_temp.pivot(index='month_year', columns=classification, values=calcul_type).fillna(0)
             if 'Index' in df_pivot.columns:
@@ -146,7 +166,12 @@ def get_monthly_data(calcul_type, classification_list, numerator_list,
     else:
         calcul_type_string = calcul_type
 
-    file_name = f'Excel/Monthly {calcul_type_string} Over {denominator}.xlsx'
+    if len(numerator_list) == 1:
+        numerator_str = numerator_list[0] + ' '
+    else:
+        numerator_str = ' '
+
+    file_name = f'Excel/Monthly {numerator_str}{calcul_type_string} Over {denominator}.xlsx'
     with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
         for result in result_list:
             result[1].to_excel(writer, sheet_name=result[0], header=True, index=True)
@@ -211,15 +236,36 @@ if __name__ == '__main__':
     start_date = date(2019, 4, 1)
     end_date = date(2023, 12, 31)
 
+    # exposure vs Short only
+    get_monthly_data(calcul_type='Exposure',
+                     classification_list=['Continent', 'Sector', 'MarketCap'],
+                     numerator_list=['Short'],
+                     denominator='Short',
+                     start_date=start_date,
+                     end_date=end_date,
+                     is_leveraged=False,
+                     is_close_pnl=True)
+
+    # exposure vs Short / Long
+    get_monthly_data(calcul_type='Exposure',
+                     classification_list=['Continent', 'Sector', 'MarketCap'],
+                     numerator_list=['Short'],
+                     denominator='Long',
+                     start_date=start_date,
+                     end_date=end_date,
+                     is_leveraged=False,
+                     is_close_pnl=True)
+
+
     # exposure vs Nav - Leveraged
-    """get_monthly_data(calcul_type='Exposure',
+    get_monthly_data(calcul_type='Exposure',
                      classification_list=['Continent', 'Sector', 'MarketCap'],
                      numerator_list=['Net', 'Long', 'Short'],
                      denominator='Nav',
                      start_date=start_date,
                      end_date=end_date,
                      is_leveraged=True,
-                     is_close_pnl=True)"""
+                     is_close_pnl=True)
 
     # exposure vs Long only
     get_monthly_data(calcul_type='Exposure',
