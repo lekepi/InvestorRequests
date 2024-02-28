@@ -20,14 +20,6 @@ Session.configure(bind=engine)
 session = Session()
 
 
-class Aum(Base):
-    __tablename__ = 'aum'
-    id = Column(Integer, primary_key=True)
-    entry_date = Column(Date)
-    amount = Column(Float)
-    type = Column(String(45))
-
-
 class Trade(Base):
     __tablename__ = 'trade'
     id = Column(Integer, primary_key=True)
@@ -164,6 +156,15 @@ class IndustryGroup(Base):
     __tablename__ = 'industry_group'
     id = Column(Integer, primary_key=True)
     name = Column(String(45))
+
+
+class Aum(Base):
+    __tablename__ = 'aum'
+    id = Column(Integer, primary_key=True)
+    entry_date = Column(Date)
+    amount = Column(Float)
+    deployed = Column(Float, default=100)
+    type = Column(String(length=45))
 
 
 class IndustryGroupGics(Base):

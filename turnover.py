@@ -5,8 +5,6 @@ from utils import simple_email
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font
 
-
-
 """
 Get the turnover by capital: for trade, we take all the net daily trade for all asset classes
 and divide it by the gross exposure (sum of all the absolute value Long+Short of the market value of the positions)
