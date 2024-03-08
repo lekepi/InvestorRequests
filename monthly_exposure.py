@@ -16,7 +16,7 @@ You can decide if the pnl intraday from trade is included or not.
 
 
 def get_monthly_exposure(classification_list, numerator_list,
-                     denominator, start_date, end_date, is_leveraged, is_close_pnl):
+                     denominator, start_date, end_date, is_leveraged):
 
     # get list of start date of the month
     my_sql = f"""SELECT MIN(entry_date) AS first_date FROM position WHERE entry_date>='{start_date}' 
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     # denominator = 'Long', 'Nav', 'Gross', 'Net'
 
     start_date = date(2019, 4, 1)
-    end_date = date(2023, 12, 31)
+    end_date = date(2024, 2, 29)
 
     # exposure vs Short only
     get_monthly_exposure(classification_list=['Continent', 'Country', 'Sector', 'MarketCap'],
@@ -196,8 +196,7 @@ if __name__ == '__main__':
                          denominator='Short',
                          start_date=start_date,
                          end_date=end_date,
-                         is_leveraged=False,
-                         is_close_pnl=True)
+                         is_leveraged=False)
 
     # exposure vs Short / Long
     get_monthly_exposure(classification_list=['Continent', 'Sector', 'MarketCap'],
@@ -205,8 +204,7 @@ if __name__ == '__main__':
                          denominator='Long',
                          start_date=start_date,
                          end_date=end_date,
-                         is_leveraged=False,
-                         is_close_pnl=True)
+                         is_leveraged=False)
 
 
     # exposure vs Nav - Leveraged
@@ -215,8 +213,7 @@ if __name__ == '__main__':
                          denominator='Nav',
                          start_date=start_date,
                          end_date=end_date,
-                         is_leveraged=True,
-                         is_close_pnl=True)
+                         is_leveraged=True)
 
     # exposure vs Long only
     get_monthly_exposure(classification_list=['Continent', 'Sector', 'MarketCap'],
@@ -224,7 +221,6 @@ if __name__ == '__main__':
                          denominator='Long',
                          start_date=start_date,
                          end_date=end_date,
-                         is_leveraged=False,
-                         is_close_pnl=True)
+                         is_leveraged=False)
 
 

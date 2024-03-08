@@ -14,7 +14,6 @@ You can decide if the exposure is leveraged or not.
 You can decide if the pnl intraday from trade is included or not.
 '''
 
-
 def get_monthly_data(calcul_type, classification_list, numerator_list,
                      denominator, start_date, end_date, is_leveraged, is_close_pnl):
 
