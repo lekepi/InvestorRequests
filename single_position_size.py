@@ -17,6 +17,9 @@ def get_position_size():
     my_sql = "SELECT entry_date,long_usd,long_usd-short_usd as gross_usd FROM alpha_summary WHERE parent_fund_id=1 order by entry_date;"
     df_long = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
 
+    my_sql = """SELECT entry_date,abs(sum(mkt_value_usd)) as short_usd FROM position WHERE parent_fund_id=1 and entry_date>='2019-04-01' and mkt_value_usd<0 group by entry_date order by entry_date;"""
+    df_short = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
+
     my_sql = "SELECT entry_date,amount*1000000 as nav_usd FROM aum WHERE type='leveraged' and entry_date>='2019-04-01';"
     df_nav = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
 
@@ -24,11 +27,14 @@ def get_position_size():
     and entry_date>='2019-04-01' and entry_date<'{date.today()}' and mkt_value_usd is Not NULL order by entry_date;"""
     df_position = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
     df_position = pd.merge(df_position, df_long, on='entry_date', how='left')
+    df_position = pd.merge(df_position, df_short, on='entry_date', how='left')
     df_position = pd.merge(df_position, df_nav, on='entry_date', how='left')
     # fill the missing value with the previous value
     df_position['nav_usd'] = df_position['nav_usd'].fillna(method='ffill')
 
     df_position['pos % of Long'] = df_position['mkt_value_usd'] / df_position['long_usd']
+    df_position.loc[df_position['mkt_value_usd'] < 0, 'pos % of Short'] = \
+        -df_position.loc[df_position['mkt_value_usd'] < 0, 'mkt_value_usd'] / df_position.loc[df_position['mkt_value_usd'] < 0, 'short_usd']
     df_position['pos % of Gross'] = df_position['mkt_value_usd'] / df_position['gross_usd']
     df_position['pos % of NAV'] = df_position['mkt_value_usd'] / df_position['nav_usd']
 
@@ -38,7 +44,7 @@ def get_position_size():
     df_position_short = df_position_short.sort_values(by='pos % of NAV', ascending=True)
 
     count_list = [20, 30, 40]
-    df_avg_size = pd.DataFrame(columns=['count', 'Avg Long Pos vs Long', 'Avg Short Pos vs Long',
+    df_avg_size = pd.DataFrame(columns=['count', 'Avg Long Pos vs Long', 'Avg Short Pos vs Short', 'Avg Short Pos vs Long',
                                         'Avg Long Pos vs NAV - Low Vol', 'Avg Short Pos vs NAV - Low Vol',
                                         'Avg Long Pos vs NAV - Alto', 'Avg Short Pos vs NAV - Alto'])
 
@@ -46,6 +52,10 @@ def get_position_size():
         df_long_avg = df_position_long.sort_values(by=['entry_date', 'pos % of Long'], ascending=[True, False])
         result = df_long_avg.groupby('entry_date').head(count).groupby('entry_date')['pos % of Long'].mean().reset_index()
         avg_long_position = result['pos % of Long'].mean()
+
+        df_short_avg = df_position_short.sort_values(by=['entry_date', 'pos % of Short'], ascending=[True, False])
+        result = df_short_avg.groupby('entry_date').head(count).groupby('entry_date')['pos % of Short'].mean().reset_index()
+        avg_short_position = result['pos % of Short'].mean()
 
         df_gross_avg = df_position_long.sort_values(by=['entry_date', 'pos % of Gross'], ascending=[True, False])
         result = df_gross_avg.groupby('entry_date').head(count).groupby('entry_date')['pos % of Gross'].mean().reset_index()
@@ -57,7 +67,7 @@ def get_position_size():
 
         df_short_avg = df_position_short.sort_values(by=['entry_date', 'pos % of Long'], ascending=[True, True])
         result = df_short_avg.groupby('entry_date').head(count).groupby('entry_date')['pos % of Long'].mean().reset_index()
-        avg_short_position = result['pos % of Long'].mean()
+        avg_short_position_vs_long = result['pos % of Long'].mean()
 
         df_gross_avg = df_position_short.sort_values(by=['entry_date', 'pos % of Gross'], ascending=[True, True])
         result = df_gross_avg.groupby('entry_date').head(count).groupby('entry_date')['pos % of Gross'].mean().reset_index()
@@ -68,7 +78,8 @@ def get_position_size():
         avg_short_position_nav = result['pos % of NAV'].mean()
 
         df_avg_size = df_avg_size._append(pd.DataFrame({'count': count, 'Avg Long Pos vs Long': avg_long_position,
-                                                        'Avg Short Pos vs Long': -avg_short_position,
+                                                        'Avg Short Pos vs Short': avg_short_position,
+                                                        'Avg Short Pos vs Long': -avg_short_position_vs_long,
                                                         'Avg Long Pos vs Gross': avg_long_position_gross,
                                                         'Avg Short Pos vs Gross': -avg_short_position_gross,
                                                         'Avg Long Pos vs NAV - Low Vol': avg_long_position_nav,
@@ -99,7 +110,7 @@ def get_position_size():
 
     for sheet in sheet_all_names:
         sheet = workbook[sheet]
-        for col in range(ord('F'), ord('H') + 1):  # Loop through columns B to G
+        for col in range(ord('H'), ord('L') + 1):  # Loop through columns B to G
             column_letter = chr(col)
             for cell in sheet[column_letter]:
                 cell.number_format = numbers.FORMAT_PERCENTAGE_00
@@ -109,14 +120,14 @@ def get_position_size():
 
     # for A to G column, format %
 
-    for col in range(ord('B'), ord('I') + 1):  # Loop through columns B to I
+    for col in range(ord('B'), ord('J') + 1):  # Loop through columns B to I
         column_letter = chr(col)
         for cell in sheet[column_letter]:
             cell.number_format = numbers.FORMAT_PERCENTAGE_00
 
     fill = PatternFill(start_color='66b8cc', end_color='66b8cc', fill_type='solid')
 
-    for col in range(1, 10):
+    for col in range(1, 11):
         cell = sheet.cell(row=1, column=col)
         cell.fill = fill
 

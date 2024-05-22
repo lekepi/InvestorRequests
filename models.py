@@ -496,6 +496,12 @@ class NavAccountStatement(Base):
     status = Column(String(length=45), default='Daily')
 
 
+class Investor(Base):
+    __tablename__ = 'investor'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100))
+
+
 def copy_trade(trade):
     amended_trade = Trade(
         order_number=trade.order_number,
