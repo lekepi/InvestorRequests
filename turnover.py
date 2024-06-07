@@ -23,7 +23,7 @@ def last_weekday_of_year(year):
 
 def turnover_capital(my_type='Gross Exposure', is_addition_redemption=True, side='Long/short'):
 
-    my_sql = """SELECT entry_date, 1000000*amount as aum FROM aum WHERE type = 'leveraged' and entry_date>='2019-04-01';"""
+    my_sql = """SELECT entry_date, 1000000*amount as aum FROM aum WHERE type='leveraged' and fund_id=4 and entry_date>='2019-04-01';"""
     df_aum = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
 
     if side == 'Long/Short':

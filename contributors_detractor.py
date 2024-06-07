@@ -17,7 +17,7 @@ order by entry_date"""
 
     df_position = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
 
-    my_sql = """SELECT entry_date,amount*1000000 as amount FROM aum WHERE type='leveraged';"""
+    my_sql = """SELECT entry_date,amount*1000000 as amount FROM aum WHERE type='leveraged' and fund_id=4;"""
     df_aum = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
 
     # merge

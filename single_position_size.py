@@ -20,7 +20,7 @@ def get_position_size():
     my_sql = """SELECT entry_date,abs(sum(mkt_value_usd)) as short_usd FROM position WHERE parent_fund_id=1 and entry_date>='2019-04-01' and mkt_value_usd<0 group by entry_date order by entry_date;"""
     df_short = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
 
-    my_sql = "SELECT entry_date,amount*1000000 as nav_usd FROM aum WHERE type='leveraged' and entry_date>='2019-04-01';"
+    my_sql = "SELECT entry_date,amount*1000000 as nav_usd FROM aum WHERE type='leveraged' and fund_id=4 and entry_date>='2019-04-01';"
     df_nav = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
 
     my_sql = f"""SELECT entry_date,T2.ticker,mkt_value_usd FROM position T1 JOIN product T2 on T1.product_id=T2.id WHERE prod_type='Cash' and parent_fund_id=1

@@ -3,6 +3,19 @@ from models import session, TaskChecker, config_class, engine
 from datetime import date
 from email.message import EmailMessage
 import smtplib
+import base64
+
+
+def encrypt_text(key, text):
+    encrypted_chars = [chr(ord(char) ^ ord(key[i % len(key)])) for i, char in enumerate(text)]
+    encrypted_text = ''.join(encrypted_chars)
+    return base64.urlsafe_b64encode(encrypted_text.encode()).decode()
+
+
+def decrypt_text(key, encrypted_text):
+    encrypted_text = base64.urlsafe_b64decode(encrypted_text).decode()
+    decrypted_chars = [chr(ord(char) ^ ord(key[i % len(key)])) for i, char in enumerate(encrypted_text)]
+    return ''.join(decrypted_chars)
 
 
 def task_checker_db(status, task_details, comment='', task_name='Get EMSX Trade', task_type='Task Scheduler ', only_new=False):

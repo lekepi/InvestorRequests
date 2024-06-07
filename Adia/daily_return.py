@@ -10,7 +10,7 @@ if __name__ == '__main__':
              " and parent_fund_id=1 group by entry_date order by entry_date;"
     df = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'], index_col=['entry_date'])
     # get AUM
-    my_sql = "Select entry_date,amount*deployed/100 as deployed_aum from aum where entry_date>='2019-04-01' and type='leveraged' order by entry_date"
+    my_sql = "Select entry_date,amount*deployed/100 as deployed_aum from aum where entry_date>='2019-04-01' and type='leveraged' and fund_id=4 order by entry_date"
     df_aum = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'], index_col=['entry_date'])
 
     # merge pnl and aum

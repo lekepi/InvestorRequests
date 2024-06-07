@@ -1,10 +1,13 @@
 
 import pandas as pd
 from models import engine, session, Investor
-from utils import simple_email
+from utils import simple_email, encrypt_text, decrypt_text
+from config import ConfigDefault
+
+secret_key = ConfigDefault.SECRET_KEY
 
 
-def get_capital_movement():
+def get_capital_movement(frequency='Year'):
 
     my_sql = """SELECT T1.id,T2.investor_id,entry_date as report_date,T1.fund_type,T1.class_name,sum(additions*additions_per/100) as additions,
         sum(redemptions*redemptions_per/100) as redemptions,sum(ending_balance*ending_per/100) as ending_balance,T3.code as cncy,
@@ -15,6 +18,7 @@ def get_capital_movement():
         HAVING (abs(sum(additions*additions_per/100))>0.1 or abs(sum(redemptions*redemptions_per/100))>0.1)
         order by entry_date desc, fund_type asc,redemptions asc;"""
 
+    # get all additions/redemtions
     df_all_change = pd.read_sql(my_sql, con=engine, index_col='id')
 
     investor_id_list = df_all_change['investor_id'].unique().tolist()
@@ -28,12 +32,12 @@ def get_capital_movement():
     df_investor_amount = df_investor_amount.fillna(0)
 
     for investor_id in investor_id_list:
-        df_change = df_all_change[df_all_change['investor_id'] == investor_id]
+        df_change = df_all_change[df_all_change['investor_id'] == investor_id].copy()
         df_change['addition_type'] = None
         df_change['redemption_type'] = None
 
-        df_change.loc[df_change['report_date'] == my_date, 'addition_type'] = "Switch"
-        df_change.loc[df_change['report_date'] == my_date, 'redemption_type'] = "Switch"
+        #df_change.loc[:, 'addition_type'] = None
+        #df_change.loc[:, 'redemption_type'] = None
 
         df_change.loc[df_change['additions'] == 0, 'addition_type'] = "Empty"
         df_change.loc[df_change['redemptions'] == 0, 'redemption_type'] = "Empty"
@@ -43,6 +47,10 @@ def get_capital_movement():
             is_loop = True
             while is_loop:
                 df_change, is_loop = get_investor_change(df_change, curr_date, date_list, i)
+                pass
+
+        # df_change.loc[df_change['report_date'] == my_date, 'addition_type'] = "Switch"
+        # df_change.loc[df_change['report_date'] == my_date, 'redemption_type'] = "Switch"
 
         # add df_change to df_investor
         for index, row in df_change.iterrows():
@@ -55,12 +63,13 @@ def get_capital_movement():
             if (not row['redemption_type'] or "Switch" not in row['redemption_type']) and redemption_usd > 0:
                 df_investor_amount.loc[row['report_date'], row['investor_id']] -= redemption_usd
             pass
+        pass
 
     investor_db = session.query(Investor).all()
     # replace investor_id with investor_name in df_investor_amount columns
     for investor in investor_db:
         investor_id = investor.id
-        investor_name = investor.name
+        investor_name = decrypt_text(secret_key, investor.encrypted_name)
         df_investor_amount.rename(columns={investor_id: investor_name}, inplace=True)
 
     # add col Additions that is the sum of positive value
@@ -71,9 +80,18 @@ def get_capital_movement():
     df_add_red = df_investor_amount[['Additions', 'Redemptions']]
     # convert index into date
     df_add_red.index = pd.to_datetime(df_add_red.index)
-    df_add_red = df_add_red.groupby(df_add_red.index.year).sum()
+    if frequency == 'Year':
+        df_add_red = df_add_red.groupby(df_add_red.index.year).sum()
+    elif frequency == 'Month':
+        # replace datetime index by -YYYY-MM'
+        df_add_red.index = df_add_red.index.strftime('%Y-%m')
+        df_add_red = df_add_red.groupby(df_add_red.index).sum()
+        full_range = pd.date_range(start=df_add_red.index.min(), end=df_add_red.index.max(), freq='MS').strftime('%Y-%m')
+        df_add_red = df_add_red.reindex(full_range, fill_value=0)
 
-    # reformat with thousand separator
+        df_add_red['Redemptions'] = df_add_red['Redemptions'].shift(1, fill_value=0)
+
+        # reformat with thousand separator
     df_add_red['Additions'] = df_add_red['Additions'].apply(lambda x: "{:,.0f}".format(x))
     df_add_red['Redemptions'] = df_add_red['Redemptions'].apply(lambda x: "{:,.0f}".format(x))
 
@@ -119,46 +137,48 @@ def get_investor_change(df_change, curr_date, date_list, i):
     df_change_curr = df_change.loc[(df_change['report_date'] == curr_date)]
     cur_day_redemption = df_change_curr.loc[df_change_curr['redemption_type'].isnull(), 'redemptions_usd'].sum()
     cur_day_addition = df_change_curr.loc[df_change_curr['addition_type'].isnull(), 'additions_usd'].sum()
-    if abs(cur_day_redemption / cur_day_addition - 1) < 0.1:
-        for l, row in df_change_curr.iterrows():
-            if row['redemption_type'] == None:
-                df_change.loc[l, 'redemption_type'] = 'Multi Switch'
-            if row['addition_type'] == None:
-                df_change.loc[l, 'addition_type'] = 'Multi Switch'
-        return df_change, True
-    # Per day Additions > Redemptions, try first to find one addition > sum(redemptions)
-    elif cur_day_addition > cur_day_redemption and cur_day_redemption>0:
-        for l, row in df_change_curr.iterrows():
-            if row['redemption_type'] == None:
-                df_change.loc[l, 'redemption_type'] = 'Extra Switch'
-        for l, row in df_change_curr.iterrows():
-            if row['addition_type'] == None and row['additions_usd'] > cur_day_redemption:
-                df_change.loc[l, 'addition_type'] = 'Partial'
-                return df_change, True
-        # if one addition line not enough, mark all additions as partial
-        for l, row in df_change_curr.iterrows():
-            if row['addition_type'] == None:
-                df_change.loc[l, 'addition_type'] = 'Partial'
-    # Per day Additions < Redemptions, try first to find one redemption > sum(additions)
-    elif cur_day_addition < cur_day_redemption and cur_day_addition > 0:
-        for l, row in df_change_curr.iterrows():
-            if row['addition_type'] == None:
-                df_change.loc[l, 'addition_type'] = 'Extra Switch'
-        for l, row in df_change_curr.iterrows():
-            if row['redemption_type'] == None and row['redemptions_usd'] > cur_day_addition:
-                df_change.loc[l, 'redemption_type'] = 'Partial'
-                return df_change, True
-        # if one redemption line not enough, mark all redemptions as partial
-        for l, row in df_change_curr.iterrows():
-            if row['redemption_type'] == None:
-                df_change.loc[l, 'redemption_type'] = 'Partial'
+    if cur_day_addition > 0:
+        if abs(cur_day_redemption / cur_day_addition - 1) < 0.1:
+            for l, row in df_change_curr.iterrows():
+                if row['redemption_type'] == None:
+                    df_change.loc[l, 'redemption_type'] = 'Multi Switch'
+                if row['addition_type'] == None:
+                    df_change.loc[l, 'addition_type'] = 'Multi Switch'
+            return df_change, True
+        # Per day Additions > Redemptions, try first to find one addition > sum(redemptions)
+        elif cur_day_addition > cur_day_redemption and cur_day_redemption>0:
+            for l, row in df_change_curr.iterrows():
+                if row['redemption_type'] == None:
+                    df_change.loc[l, 'redemption_type'] = 'Extra Switch'
+            for l, row in df_change_curr.iterrows():
+                if row['addition_type'] == None and row['additions_usd'] > cur_day_redemption:
+                    df_change.loc[l, 'addition_type'] = 'Partial'
+                    return df_change, True
+            # if one addition line not enough, mark all additions as partial
+            for l, row in df_change_curr.iterrows():
+                if row['addition_type'] == None:
+                    df_change.loc[l, 'addition_type'] = 'Partial'
+        # Per day Additions < Redemptions, try first to find one redemption > sum(additions)
+        elif cur_day_addition < cur_day_redemption and cur_day_addition > 0:
+            for l, row in df_change_curr.iterrows():
+                if row['addition_type'] == None:
+                    df_change.loc[l, 'addition_type'] = 'Extra Switch'
+            for l, row in df_change_curr.iterrows():
+                if row['redemption_type'] == None and row['redemptions_usd'] > cur_day_addition:
+                    df_change.loc[l, 'redemption_type'] = 'Partial'
+                    return df_change, True
+            # if one redemption line not enough, mark all redemptions as partial
+            for l, row in df_change_curr.iterrows():
+                if row['redemption_type'] == None:
+                    df_change.loc[l, 'redemption_type'] = 'Partial'
 
-        return df_change, True
+            return df_change, True
     return df_change, False
 
 
+
 def get_investor_in_out():
-    my_sql = """SELECT T1.id,T3.name as investor,entry_date as report_date,
+    my_sql = """SELECT T1.id,T3.encrypted_name as investor,entry_date as report_date,
         sum(ending_balance*ending_per/100/fx_rate) as ending_balance_usd FROM investor_capital T1 
         JOIN investor_alloc T2 on T1.id=T2.investor_capital_id JOIN investor T3 on T2.investor_id=T3.id
         group by entry_date,report_date,investor_id order by entry_date"""
@@ -195,7 +215,7 @@ def get_investor_in_out():
 
 
 if __name__ == '__main__':
-    df_add_red = get_capital_movement()
+    df_add_red = get_capital_movement(frequency='Month')  # Month, Year
     df_inv_in_out = get_investor_in_out()
 
     html = "<html><body><h3>Capital Change</h3>"

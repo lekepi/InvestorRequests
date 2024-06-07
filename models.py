@@ -165,6 +165,8 @@ class Aum(Base):
     amount = Column(Float)
     deployed = Column(Float, default=100)
     type = Column(String(length=45))
+    fund_id = Column(ForeignKey("fund.id"))
+    fund = relationship("Fund")
 
 
 class IndustryGroupGics(Base):
@@ -499,7 +501,7 @@ class NavAccountStatement(Base):
 class Investor(Base):
     __tablename__ = 'investor'
     id = Column(Integer, primary_key=True)
-    name = Column(String(100))
+    encrypted_name = Column(String(200))
 
 
 def copy_trade(trade):

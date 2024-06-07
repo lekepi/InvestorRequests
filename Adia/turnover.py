@@ -10,7 +10,7 @@ def get_turn_over():
 
     df_buy_sell = pd.read_sql(my_sql, con=engine, index_col='year')
 
-    my_sql = "SELECT year(entry_date) as year, avg(amount) as amount FROM aum where type='Leveraged' group by year(entry_date);"
+    my_sql = "SELECT year(entry_date) as year, avg(amount) as amount FROM aum where type='Leveraged' and fund_id=4 group by year(entry_date);"
     df_aum = pd.read_sql(my_sql, con=engine, index_col='year')
 
     df = df_buy_sell.join(df_aum, how='outer')

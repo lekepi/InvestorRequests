@@ -5,7 +5,7 @@ from datetime import date
 
 def weekly_return(start_date, end_date, is_close_pnl):
     my_sql = f"""Select entry_date,amount*1000000 as aum from aum where entry_date>='2019-04-01' 
-                    and entry_date>='{start_date}' and entry_date<='{end_date}' and type='leveraged' order by entry_date"""
+                    and entry_date>='{start_date}' and entry_date<='{end_date}' and type='leveraged' and fund_id=4 order by entry_date"""
     df_aum = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
 
     my_sql = f"""SELECT T1.entry_date,T2.ticker,sum(T1.pnl_usd) as pnl_usd FROM position T1 JOIN product T2 on T1.product_id=T2.id

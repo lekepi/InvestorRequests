@@ -55,7 +55,7 @@ def get_monthly_exposure(classification_list, numerator_list,
         df_denominator.rename(columns={'notional_usd': 'denominator'}, inplace=True)
     elif denominator == 'Nav':
         my_sql = f"""Select entry_date,amount*1000000 as denominator from aum where entry_date>='2019-04-01' 
-                and entry_date>='{start_date}' and entry_date<='{end_date}' and type='leveraged' order by entry_date"""
+                and entry_date>='{start_date}' and entry_date<='{end_date}' and type='leveraged' and fund_id=4 order by entry_date"""
         df_denominator = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
         df_denominator['month_year'] = df_denominator['entry_date'].dt.strftime('%Y-%m')
         df_denominator.drop(columns=['entry_date'], inplace=True)

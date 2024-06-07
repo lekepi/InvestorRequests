@@ -41,7 +41,7 @@ def get_exposure_last(classification_list, numerator_list, denominator, entry_da
         elif start_date.weekday() == 6:
             start_date = start_date + timedelta(days=1)
 
-        aum = session.query(Aum).filter(Aum.entry_date == start_date, Aum.type == 'leveraged').all()
+        aum = session.query(Aum).filter(Aum.entry_date == start_date, Aum.type == 'leveraged', Aum.fund_id == 4).all()
         if aum:
             denominator_value = aum[0].amount * 1000000
 

@@ -19,7 +19,7 @@ def get_monthly_aum(start_date, end_date, is_leveraged):
         multiple = 1
         title = 'Fund'
 
-    my_sql = f"""SELECT entry_date,amount*{multiple} as amount FROM aum WHERE type='{my_type}'
+    my_sql = f"""SELECT entry_date,amount*{multiple} as amount FROM aum WHERE type='{my_type}' AND fund_id=4
     AND entry_date>='{start_date}' and entry_date<='{end_date}' order by entry_date;"""
     df_aum = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'], index_col='entry_date')
 
