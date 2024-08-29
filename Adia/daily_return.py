@@ -5,6 +5,10 @@ import numpy as np
 
 
 if __name__ == '__main__':
+
+    # Get the daily return (on Alto), get the average on one year, calculate stdev, VAR and CVAR and roll it.
+    # Then keep only the last values for each month
+
     # get pnl
     my_sql = "SELECT entry_date,sum(pnl_usd) as pnl FROM position WHERE entry_date>='2019-04-01'" \
              " and parent_fund_id=1 group by entry_date order by entry_date;"

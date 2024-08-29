@@ -3,12 +3,15 @@ import pandas as pd
 from models import engine, session, Investor
 from utils import simple_email, encrypt_text, decrypt_text
 from config import ConfigDefault
+from datetime import datetime
 
 secret_key = ConfigDefault.SECRET_KEY
 
 
 def get_capital_movement(frequency='Year'):
+    # get the additions/redemptions per month (taking into account the switch)
 
+    print("Current Time:", datetime.now().time())
     my_sql = """SELECT T1.id,T2.investor_id,entry_date as report_date,T1.fund_type,T1.class_name,sum(additions*additions_per/100) as additions,
         sum(redemptions*redemptions_per/100) as redemptions,sum(ending_balance*ending_per/100) as ending_balance,T3.code as cncy,
         sum(additions*additions_per/100/fx_rate) as additions_usd, sum(redemptions*redemptions_per/100/fx_rate) as redemptions_usd, 
@@ -94,11 +97,12 @@ def get_capital_movement(frequency='Year'):
         # reformat with thousand separator
     df_add_red['Additions'] = df_add_red['Additions'].apply(lambda x: "{:,.0f}".format(x))
     df_add_red['Redemptions'] = df_add_red['Redemptions'].apply(lambda x: "{:,.0f}".format(x))
-
+    print("Current Time:", datetime.now().time())
     return df_add_red
 
 
 def get_investor_change(df_change, curr_date, date_list, i):
+    # get the number of new investors and leaving investors per year
     df_change_curr = df_change.loc[(df_change['report_date'] == curr_date)]
     df_change_next = pd.DataFrame()
     if i + 1 < len(date_list):
