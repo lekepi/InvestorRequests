@@ -21,7 +21,7 @@ def last_weekday_of_year(year):
     return last_day
 
 
-def turnover_capital(my_type='Gross Exposure', is_addition_redemption=True, side='Long/short'):
+def turnover_capital(my_type='Gross Exposure', is_addition_redemption=True, side='Long/Short'):
 
     my_sql = """SELECT entry_date, 1000000*amount as aum FROM aum WHERE type='leveraged' and fund_id=4 and entry_date>='2019-04-01';"""
     df_aum = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
@@ -32,14 +32,14 @@ def turnover_capital(my_type='Gross Exposure', is_addition_redemption=True, side
         and T1.parent_fund_id=1 GROUP BY trade_date,ticker ORDER BY trade_date,ticker;"""
     elif side == 'Long':
         my_sql = f"""SELECT T2.ticker FROM position T1 JOIN product T2 on T1.product_id=T2.id WHERE 
-        entry_date>'2019-04-01' and parent_fund_id=1 and prod_type in ('cash','future') group by ticker having avg(mkt_value_usd)>0;"""
+        entry_date>'2019-04-01' and parent_fund_id=1 and prod_type='cash' group by ticker having avg(mkt_value_usd)>0;"""
         df_ticker = pd.read_sql(my_sql, con=engine)
         df_ticker = df_ticker['ticker'].tolist()
         # get the string for sql
         ticker_list = "'" + "','".join(df_ticker) + "'"
         my_sql = f"""SELECT trade_date,T2.ticker,ABS(SUM(T1.notional_usd)) AS trade_usd FROM trade T1 
         JOIN product T2 ON T1.product_id = T2.id WHERE T2.still_active=1 and trade_date>='2019-04-01'
-        and T1.parent_fund_id=1 and T1.notional_usd>0 and T2.ticker in ({ticker_list }) GROUP BY trade_date,ticker ORDER BY trade_date,ticker;"""
+        and T1.parent_fund_id=1 and T2.ticker in ({ticker_list}) GROUP BY trade_date,ticker ORDER BY trade_date,ticker;"""
     else:
         my_sql = f"""SELECT T2.ticker FROM position T1 JOIN product T2 on T1.product_id=T2.id WHERE 
         entry_date>'2019-04-01' and parent_fund_id=1 and prod_type in ('cash','future') group by ticker having avg(mkt_value_usd)>0;"""
@@ -49,16 +49,17 @@ def turnover_capital(my_type='Gross Exposure', is_addition_redemption=True, side
         ticker_list = "'" + "','".join(df_ticker) + "'"
         my_sql = f"""SELECT trade_date,T2.ticker,ABS(SUM(T1.notional_usd)) AS trade_usd FROM trade T1 
         JOIN product T2 ON T1.product_id = T2.id WHERE T2.still_active=1 and trade_date>='2019-04-01'
-        and T1.parent_fund_id=1 and T1.notional_usd<0 and T2.ticker in ({ticker_list }) GROUP BY trade_date,ticker ORDER BY trade_date,ticker;"""
+        and T1.parent_fund_id=1 and T2.ticker in ({ticker_list}) GROUP BY trade_date,ticker ORDER BY trade_date,ticker;"""
 
     df_trade = pd.read_sql(my_sql, con=engine, parse_dates=['trade_date'])
     # group by trade_date
     df_trade = df_trade.groupby('trade_date')['trade_usd'].sum().reset_index()
     # rename trade_date to entry_date
     df_trade = df_trade.rename(columns={'trade_date': 'entry_date'})
-    if side == 'Long/short':
+    if side == 'Long/Short':
         if my_type == 'Gross Exposure':
-            my_sql = """SELECT entry_date, sum(abs(mkt_value_usd)) as gross_usd FROM position T1 GROUP BY entry_date;"""
+            my_sql = """SELECT entry_date, sum(abs(mkt_value_usd)) as gross_usd FROM position T1 
+            WHERE T1.parent_fund_id=1 GROUP BY entry_date;"""
             df_gross = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
             # merge df_trade and df_gross
             df = pd.merge(df_trade, df_gross, on='entry_date', how='left')
@@ -73,13 +74,15 @@ def turnover_capital(my_type='Gross Exposure', is_addition_redemption=True, side
             df['aum'] = df['aum'].fillna(method='ffill')
             df['turnover'] = df['trade_usd'] / df['aum']
     elif side == 'Long':
-        my_sql = """SELECT entry_date, sum(abs(mkt_value_usd)) as long_usd FROM position T1 WHERE mkt_value_usd>0 GROUP BY entry_date;"""
+        my_sql = """SELECT entry_date, sum(abs(mkt_value_usd)) as long_usd FROM position T1 JOIN product T2 
+        on T1.product_id=T2.id WHERE prod_type='cash' and mkt_value_usd>0 and T1.parent_fund_id=1 GROUP BY entry_date;"""
         df_long = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
         # merge df_trade and df_gross
         df = pd.merge(df_trade, df_long, on='entry_date', how='left')
         df['turnover'] = df['trade_usd'] / df['long_usd']
     elif side == 'Short':
-        my_sql = """SELECT entry_date, sum(abs(mkt_value_usd)) as short_usd FROM position T1 WHERE mkt_value_usd<0 GROUP BY entry_date;"""
+        my_sql = """SELECT entry_date, sum(abs(mkt_value_usd)) as short_usd FROM position T1 WHERE mkt_value_usd<0 
+        and T1.parent_fund_id=1 GROUP BY entry_date;"""
         df_short = pd.read_sql(my_sql, con=engine, parse_dates=['entry_date'])
         # merge df_trade and df_gross
         df = pd.merge(df_trade, df_short, on='entry_date', how='left')
@@ -202,12 +205,17 @@ def get_turnover(my_type, is_addition_redemption, name_number, capital_side, nam
 
 
 if __name__ == '__main__':
+
+    df_year = turnover_capital('', False, side='Long')
+    df_year.to_excel('Excel/Turnover Long.xlsx', sheet_name='Turnover', startrow=0, index=False, header=True)
+
     my_type = "Gross Exposure"  # "AUM Leveraged"
     is_addition_redemption = True
-    capital_side = 'Long'  # 'Long/Short'
+    capital_side = 'Long/Short'  # 'Long'
     name_side = 'Long'  # 'Long'
     name_number = 30
     get_turnover(my_type, is_addition_redemption, name_number, capital_side, name_side)
+
 
 
 

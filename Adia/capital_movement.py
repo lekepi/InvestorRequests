@@ -180,7 +180,6 @@ def get_investor_change(df_change, curr_date, date_list, i):
     return df_change, False
 
 
-
 def get_investor_in_out():
     my_sql = """SELECT T1.id,T3.encrypted_name as investor,entry_date as report_date,
         sum(ending_balance*ending_per/100/fx_rate) as ending_balance_usd FROM investor_capital T1 

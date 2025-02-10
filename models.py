@@ -504,6 +504,17 @@ class Investor(Base):
     encrypted_name = Column(String(200))
 
 
+class Employee(Base):
+    __tablename__ = 'employee'
+    id = Column(Integer, primary_key=True)
+    first_name = Column(String(45))
+    last_name = Column(String(45))
+    start_date = Column(Date)
+    end_date = Column(Date)
+    status = Column(String(45))
+    employment = Column(String(45))
+
+
 def copy_trade(trade):
     amended_trade = Trade(
         order_number=trade.order_number,

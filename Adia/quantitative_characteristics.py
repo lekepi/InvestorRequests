@@ -46,7 +46,6 @@ and entry_date>='2019-04-01' and data_name='RETURN USD CLASS L' order by entry_d
 
     df_result = pd.DataFrame(columns=periods, index=index_values)
 
-
     for period in periods:
         if period in ['2023', '2022', '2021']:
             # keep when index start with 2021, 2022, 2023
