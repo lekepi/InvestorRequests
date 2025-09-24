@@ -1,0 +1,31 @@
+Request:
+
+1)	Daily PnL – can you please populate the daily PnL of the returns for the Market Neutral full track (gross of performance & net of cash returns if any)
+
+We will show Boothbay perf for first loss only, that means from 08/19 until 10/20. To get the data, go to Intranet->Fund-> Due Diligence Reports
+There, in Attribution report, change Fund to Boothbay, change divisor to Gross, change period to Daily, change end date to 2020-10-31
+
+2)	EOM positions – can you populate the end of month positions snapshot timeseries accordingly in the file for the full track
+Run the script
+
+They have a template for both format
+
+--------------------------------------------------------------
+
+24/09 - They requested the perf of Alto.
+We are going to give the perf vs Long using Due Diligence Reports -> Attribution report
+Divisor=Nav, Leveraged Yes, Ramp up yes, Period Daily, Total only
+
+For the alpha we take alto (not low vol) from alpha alto, stop the code to get the daily alpha from alto and universe.
+We stopped at end of august
+Be careful the df is cummulative, what we give is daily
+
+We also gave the universe member (just europe and US):
+
+SELECT T2.ticker FROM product_universe T1 JOIN product T2 on T1.product_id=T2.id
+JOIN exchange T3 on T2.exchange_id=T3.id JOIN country T4 on T3.country_id=T4.id WHERE end_date is NULL and continent='EMEA' order by ticker;
+
+SELECT T2.ticker FROM product_universe T1 JOIN product T2 on T1.product_id=T2.id
+JOIN exchange T3 on T2.exchange_id=T3.id JOIN country T4 on T3.country_id=T4.id WHERE end_date is NULL and continent='AMER' order by ticker;
+
+--------------------------------------------------------------

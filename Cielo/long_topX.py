@@ -44,7 +44,7 @@ def get_top_position(position_count, start_date):
                                                                  current_year_month)]['pnl_usd'].sum()
             size = notional / aum
             return_ = pnl / aum
-            df_result = df_result._append({'year_month': current_year_month, 'count':count, 'ticker': ticker,
+            df_result = df_result._append({'year_month': current_year_month, 'count': count, 'ticker': ticker,
                                            'size': size, 'return': return_}, ignore_index=True)
             count += 1
     # export into excel
