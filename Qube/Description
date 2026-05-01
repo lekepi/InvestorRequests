@@ -28,4 +28,23 @@ JOIN exchange T3 on T2.exchange_id=T3.id JOIN country T4 on T3.country_id=T4.id 
 SELECT T2.ticker FROM product_universe T1 JOIN product T2 on T1.product_id=T2.id
 JOIN exchange T3 on T2.exchange_id=T3.id JOIN country T4 on T3.country_id=T4.id WHERE end_date is NULL and continent='AMER' order by ticker;
 
+They also requested the EOM position for alto, we gave until end of may (I added the function find_position_alto)
+I removed options and index not SPX and SXXP, + all long<300k
+
+
 --------------------------------------------------------------
+
+01/10 - They requested the liquidity of alto.
+We did a volume analysis to check the trading volume vs daily volume for Alto since inception with worst 5 stocks liquidity.
+There is 2 analysis: one with all stocks, one excluding 5,6 illiquid stock. The code is in Data Analysis project, volume Analysis file.
+The result email is in the current folder (Alto Liquidity_xlxs).
+
+--------------------------------------------------------------
+
+05/01
+We want to show the outperformance of LS vs Alto - 0.8(0.7STOXX600+0.3INDU) Using Man return
+We did it for November and December.
+For alto we are using Due Diligence Reports -> Attribution report, Divisor=Nav, Leveraged Yes, Ramp up yes, Period Daily, Total only
+For LS we use 0BP from Dashboard Long Short performance, run local portal, stop function get_man_perf at the end, export, df_pnl, use total perf column
+for 0.7STOXX600+0.3INDU, we use BBG
+All the data are then computated in Qube - LS vs Alto DONT SEND excel file

@@ -133,3 +133,11 @@ def append_excel(df_des, title, ws):
 
     for row in rows:
         ws.append(row)
+
+
+def find_previous_date(my_date):
+    if my_date.weekday() == 0:
+        previous_date = my_date - timedelta(days=3)
+    else:
+        previous_date = my_date - timedelta(days=1)
+    return previous_date
