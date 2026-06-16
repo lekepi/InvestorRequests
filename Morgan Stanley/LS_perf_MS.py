@@ -4,75 +4,11 @@ import pandas as pd
 import numpy as np
 from utils import find_previous_date
 
-# get_qube_trade() get only the trades for QUBE with their format (sizex3)
-# get_qube_analysis() get the analysis for QUBE trades, including the PnL intraday, position exxec fee per day
 
+# TODO: First you need to update the trades and position from MAN and update
+#  the database and reconcile to make sure everything adds up
 
-def get_qube_trade():
-
-    my_sql = f"""SELECT ticker,prod_type,product_id,notional,price,exec_qty,fx_rate,submitted_time,
-        CAST(submitted_time AS DATE) AS trade_date FROM man_trade T1 JOIN product T2 ON T1.product_id = T2.id;"""
-    df_trade = pd.read_sql(my_sql, con=engine)
-
-    # if ticker='SXO1 EUX' replace with 'SXO1 Index' else add ' Equity at the end
-    df_trade['ticker'] = np.where(df_trade['ticker'] == 'SXO1 EUX', 'SXO1 Index', df_trade['ticker'] + ' Equity')
-
-    df_trade['submitted_time'] = pd.to_datetime(df_trade['submitted_time'])
-
-    # Localize to London time (handles DST automatically)
-    df_trade['submitted_time_london'] = df_trade['submitted_time'].dt.tz_localize('Europe/London')
-
-    # Convert to US Eastern time (handles different DST rules automatically)
-    df_trade['submitted_time_ny'] = df_trade['submitted_time_london'].dt.tz_convert('US/Eastern')
-
-    df_trade['qube_qty'] = df_trade['exec_qty'] * 3
-    mask = df_trade['ticker'] == 'SXO1 Index'
-
-    df_trade.loc[mask, 'qube_qty'] = np.where(
-        df_trade.loc[mask, 'qube_qty'] > 0,
-        np.floor(df_trade.loc[mask, 'qube_qty']),
-        np.ceil(df_trade.loc[mask, 'qube_qty'])
-    )
-
-    df_trade['submitted_time_london'] = df_trade['submitted_time_london'].dt.tz_localize(None)
-    df_trade['submitted_time_ny'] = df_trade['submitted_time_ny'].dt.tz_localize(None)
-    df_trade.to_excel('qube_trade.xlsx', index=False)
-
-    df_out = df_trade[['submitted_time_ny', 'ticker', 'qube_qty']].copy()
-    df_out.columns = ['TS - US Eastern time', 'ID_BBG', 'TRADED QUANTITY']
-
-    df_out['TS - US Eastern time'] = df_out['TS - US Eastern time'].dt.tz_localize(None)
-
-    with pd.ExcelWriter('Qube format Ananda LS.xlsx', engine='xlsxwriter') as writer:
-        df_out.to_excel(writer, index=False, sheet_name='trades')
-
-        workbook = writer.book
-        worksheet = writer.sheets['trades']
-
-        # 1. Define formats
-        date_format = workbook.add_format({'num_format': 'dd/mm/yyyy hh:mm:ss'})
-        grey_format = workbook.add_format({'bg_color': '#F2F2F2'})  # Light grey
-
-        # 2. Make columns larger (adjust the numbers '22', '20' as needed)
-        worksheet.set_column('A:A', 22, date_format) # TS - US Eastern time column
-        worksheet.set_column('B:B', 20)              # ID_BBG column
-        worksheet.set_column('C:C', 20)              # TRADED QUANTITY column
-
-        # 3. Apply alternating row colors
-        # Get dataframe dimensions to know exactly where to apply the formatting
-        max_row = len(df_out)
-        max_col = len(df_out.columns) - 1
-
-        # Apply conditional formatting from row 1 (skipping header) to max_row
-        worksheet.conditional_format(1, 0, max_row, max_col, {
-            'type': 'formula',
-            'criteria': '=MOD(ROW(), 2) = 0',
-            'format': grey_format
-        })
-
-
-
-def get_qube_analysis():
+def get_ms_perf():
     my_date = date(2025, 10, 7)
 
     my_sql = f"""SELECT product_id,ticker,prod_type,currency_id,is_cent FROM man_trade T1 JOIN product T2 on T1.product_id=T2.id 
@@ -83,18 +19,18 @@ def get_qube_analysis():
     CAST(submitted_time AS DATE) AS trade_date FROM man_trade T1 JOIN product T2 ON T1.product_id = T2.id;"""
     df_trade = pd.read_sql(my_sql, con=engine)
 
-    df_trade['qube_qty'] = df_trade['exec_qty'] * 3
-    # if ticker='SXO1 EUX' if qube_qty>0, round down next integer, if qube_qty<0, round up next integer
+    df_trade['ms_quantity'] = df_trade['exec_qty'] * 3
+    # if ticker='SXO1 EUX' if ms_quantity>0, round down next integer, if ms_quantity<0, round up next integer
     mask = df_trade['ticker'] == 'SXO1 EUX'
 
-    df_trade.loc[mask, 'qube_qty'] = np.where(
-        df_trade.loc[mask, 'qube_qty'] > 0,
-        np.floor(df_trade.loc[mask, 'qube_qty']),
-        np.ceil(df_trade.loc[mask, 'qube_qty'])
+    df_trade.loc[mask, 'ms_quantity'] = np.where(
+        df_trade.loc[mask, 'ms_quantity'] > 0,
+        np.floor(df_trade.loc[mask, 'ms_quantity']),
+        np.ceil(df_trade.loc[mask, 'ms_quantity'])
     )
 
     df_product['position'] = 0
-    trade_fee = 2
+    trade_fee = 0
 
     df_result = pd.DataFrame(columns=[
         'entry_date',
@@ -158,7 +94,7 @@ def get_qube_analysis():
         # get trade for the day
         temp_trade = df_trade[df_trade['trade_date'] == my_date]
         for index, row in temp_trade.iterrows():
-            qube_qty = row['qube_qty']
+            ms_quantity = row['ms_quantity']
             exec_price = row['price']
             product_id = row['product_id']
             fx_rate = row['fx_rate']
@@ -169,11 +105,11 @@ def get_qube_analysis():
             is_cent = df_product[df_product['product_id'] == product_id]['is_cent'].values[0]
             prod_type = df_product[df_product['product_id'] == product_id]['prod_type'].values[0]
 
-            pnl_trading_usd = qube_qty * (close_price - exec_price) * np.where(prod_type == 'future', 50, 1) * fx_rate
-            trading_usd = abs(qube_qty) * exec_price * np.where(prod_type == 'future', 50, 1) * fx_rate
+            pnl_trading_usd = ms_quantity * (close_price - exec_price) * np.where(prod_type == 'future', 50, 1) * fx_rate
+            trading_usd = abs(ms_quantity) * exec_price * np.where(prod_type == 'future', 50, 1) * fx_rate
             exec_fee_usd = -(trading_usd) * trade_fee / 10000
             # add to df_product
-            df_product.loc[df_product['product_id'] == product_id, 'position'] += qube_qty
+            df_product.loc[df_product['product_id'] == product_id, 'position'] += ms_quantity
             df_product.loc[df_product['product_id'] == product_id, 'pnl_trading_usd'] = pnl_trading_usd
             df_product.loc[df_product['product_id'] == product_id, 'trading_usd'] = trading_usd
             df_product.loc[df_product['product_id'] == product_id, 'exec_fee_usd'] = exec_fee_usd
@@ -210,11 +146,81 @@ def get_qube_analysis():
         while my_date.weekday() >= 5:
             my_date += timedelta(days=1)
 
-    # export df_result to excel
-    df_result.to_excel('qube_man_analysis.xlsx', index=False)
-    df_trade.to_excel('qube_trade.xlsx', index=False)
+    df_result['pnl_usd'] = df_result['pnl_position_usd'] + df_result['pnl_trading_usd'] + df_result['exec_fee_usd']
+    df_result['Return vs Gross'] = df_result['pnl_usd'] / df_result['gross_usd']
+
+    # remove first line
+    df_result = df_result.iloc[1:]
+    df_result = df_result.drop(columns=['trading_usd', 'pnl_position_usd', 'pnl_trading_usd', 'exec_fee_usd'])
+
+    # Create a Pandas Excel writer using XlsxWriter as the engine
+    writer = pd.ExcelWriter('LS_perf_analysis.xlsx', engine='xlsxwriter')
+    df_result.to_excel(writer, index=False, sheet_name='Performance')
+
+    # Get the xlsxwriter workbook and worksheet objects
+    workbook = writer.book
+    worksheet = writer.sheets['Performance']
+
+    # Define the formatting
+    int_format = workbook.add_format({'num_format': '#,##0'})
+    pct_format = workbook.add_format({'num_format': '0.00%'})
+
+    # Apply formats to specific columns
+    # Columns B to F (indices 1 through 5) -> Integer with thousand separator
+    worksheet.set_column(1, 5, 15, int_format)
+
+    # Column G (index 6) -> Percentage
+    worksheet.set_column(6, 6, 15, pct_format)
+
+    # Close the writer to save the file
+    writer.close()
+
+
+def get_portfolio(my_date):
+    next_date = my_date + timedelta(days=1)
+
+    my_sql = f"""SELECT ticker,prod_type,product_id,notional,price,exec_qty,submitted_time,
+    is_cent,multiplier,currency_id FROM man_trade T1 JOIN product T2 ON T1.product_id = T2.id
+    WHERE submitted_time<'{next_date}';"""
+    df_trade = pd.read_sql(my_sql, con=engine)
+
+    df_trade['is_cent'] = df_trade['is_cent'].fillna(0)
+    df_trade['multiplier'] = df_trade['multiplier'].fillna(1)
+
+    df_trade['quantity'] = df_trade['exec_qty'] * 3
+    # if ticker='SXO1 EUX' if quantity>0, round down next integer, if quantity<0, round up next integer
+    mask = df_trade['ticker'] == 'SXO1 EUX'
+
+    df_trade.loc[mask, 'quantity'] = np.where(
+        df_trade.loc[mask, 'quantity'] > 0,
+        np.floor(df_trade.loc[mask, 'quantity']),
+        np.ceil(df_trade.loc[mask, 'quantity']))
+
+    df_position = df_trade.groupby(['ticker', 'is_cent', 'multiplier', 'currency_id'],
+        as_index=False)['quantity'].sum()
+    df_position = df_position[df_position['quantity'] != 0]
+    df_position['multiplier'] = df_position['multiplier'].fillna(1)
+
+    my_sql = f"""SELECT currency_id,rate as fx_rate FROM currency_history where entry_date='{my_date}'"""
+    df_fx = pd.read_sql(my_sql, con=engine)
+
+    ticker_list = df_position['ticker'].unique().tolist()
+    ticker_list_sql = ','.join([f"'{ticker}'" for ticker in ticker_list])
+    my_sql = f"""SELECT ticker,price FROM product_market_data T1 JOIN product T2 on T1.product_id=T2.id
+                 WHERE entry_date='{my_date}' and ticker in ({ticker_list_sql})"""
+    df_close_price = pd.read_sql(my_sql, con=engine)
+
+    df_position = df_position.merge(df_fx, left_on='currency_id', right_on='currency_id', how='left')
+    df_position = df_position.merge(df_close_price, left_on='ticker', right_on='ticker', how='left')
+    df_position['cent_factor'] = df_position['is_cent'].apply(lambda x: 0.01 if x == 1 else 1.0)
+    df_position['notional_usd'] = (df_position['multiplier'] * df_position['price'] * df_position['quantity'] *
+                                          df_position['cent_factor']) / df_position['fx_rate']
+
+    df_position.to_excel(f'LS_portfolio_{my_date}.xlsx', index=False)
 
 
 if __name__ == '__main__':
-    # get_qube_trade()
-    get_qube_analysis()
+    # get_ms_perf()
+
+    my_date = date(2026, 5, 29)
+    get_portfolio(my_date)

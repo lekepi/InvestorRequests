@@ -1,0 +1,14 @@
+First they requested the perf and a portfolio snapshot
+it was covered with: LS_Perf_PacificWay.py
+
+    my_date = date(2025, 10, 7)
+    get_ms_perf(my_date)
+
+    my_date = date(2026, 5, 29)
+    get_portfolio(my_date)
+
+
+  Then they requested the stock universe (15/06/2026)
+  covered by pacific_stock_universe: get_stock_universe() - Stock Universe.xlsx
+  and the portfolio snapshot for all EOM 2026 covered by LS_Perf_PacificWay.py - get_eom_portfolio(2026)
+  result: LS_EOM_portfolio_2026.slsx
