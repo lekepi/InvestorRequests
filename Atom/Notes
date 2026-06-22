@@ -1,0 +1,13 @@
+On the 22/06/2026 I completed an atom exposure return template for them
+
+1) Alto:
+I got contribution from Attribution reports (monthly)
+I got exposure from exposure report (monthly)
+I got net return and Fund AUM from Due Dilligence table (no ramp up), same for the net return
+
+For the count of long and short position I run Atom_count_position_alto.py
+For Exposure, I run atom exposure_alto.py
+
+2) Long Short:
+I use the module atom_long_short_data.py
+for exposure, I run atom_exposure_long_short
